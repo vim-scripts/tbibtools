@@ -1,0 +1,152 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=1915
+
+tbibtools provide a simple regexp-based bibtex parser. Please be aware 
+that this script makes a few assumptions on how a bib file should look 
+like and that it may fail on files formatted in unusual ways. Failure 
+may lead to loss of bib entries and malformed or incomplete output.  
+Comments and other text will be stripped when reformatting entries. Any 
+feature of bibtex I don't know and/or don't use myself is most likely 
+not supported by this script/class.
+
+Please take care when using this script. Make backups and check the 
+output, especially when using the -f command-line option. Don't blame me 
+if you lose information or end up with corrupted bib files.
+
+
+Features:
+    - sort bib files
+    - reformat bib files
+    - list keys in a bib file
+    - show bib entries matching a regular expression
+
+
+From the commands line:
+
+The ruby directory contains a file tbibtools.rb that can be used as a 
+stand-alone script from the command line. For command-line use, only the 
+file tbibtools.rb and a ruby interpreter is needed.
+
+    tbibtools [OPTIONS] < IN > OUT
+
+
+For vim users:
+
+The file plugin/tbibtools.vim provides the commands
+
+    :'<,'>TBibTools [OPTIONS]
+        Filter the selected text or the whole buffer through 
+        tbibtools.rb. The command line options are the same as for the 
+        script.
+
+    :'<,'>TBibList [OPTIONS]
+        List keys in a bibtex file (mostly the same as TBibTools --ls 
+        but lets you select an entry and jump to its position in the 
+        bibtex file).
+
+
+Options:
+
+    -i          ... case insensitive
+    -e REGEXP   ... display entries matching the regexp
+    -f FORMATS  ... re-format (order matters, comma-separated list): 
+                    align, bracket, check, downcaseType, gsub, indent, 
+                    list, nil, nnIsYear, ls, tml, stripEmpty, 
+                    stripRedundantTitel, unwrap, upcaseType, wrap
+    --ls        ... synonym for: -f list,stripPrelude ("list" implies 
+    "unwrap")
+    -l FORMAT   ... format string for list
+    -q FIELD=RX ... show entries for which field matches the regexp
+    -P          ... strip the prelude: same as -f stripPrelude but helps 
+    to maintain the original formatting
+    -s FIELD    ... sort (default: sort by key; key = _id, type = _type)
+    -S          ... replace/expand strings
+    --strip FIELDS ... ignore/strip fields
+    -u          ... unsorted
+
+
+Formats:
+
+Formats can be easily plugged in by defining a method (see 
+TBibTools#format). As the formatters process the entry one after the 
+other, the order given on the command line matters.
+
+Please scrutinize the output carefully. The use of an incomplete or simply 
+the wrong set of formatters can easily result in a corrupted bib file 
+that bibtex cannot read.
+
+    align
+         Align the = sign.
+
+    bracket
+         Enclose non-numeric values in curly braces.
+
+    gsub=FROM1:TO2:FROM2:TO2
+         Replace text in the value.
+
+    indent,
+         indent=N (default=4) Indent the entry's key-value pairs.
+
+    nil
+         Don't print any output.
+
+    stripRedundantTitel
+         If an entry has a title and a booktitle field with the
+         same value, only the booktitle field will be propagated.
+
+    stripEmpty
+         Drop fields with empty values.
+
+    unwrap
+         Put wrapped text into a single line.
+
+    wrap
+         Try to cheaply wrap the value.
+
+    check
+         Print a warning on invalid entries
+
+    nnIsYear
+         Try to correctly sort two-digit numbers in the key, i.e. sort 
+         example99 before example00.
+
+    downcaseType
+         Downcase the bibtex type.
+
+    upcaseType
+         Put the bibtex type in upper case letters.
+
+    list
+         List keys only.
+
+    stripPrelude
+         Drop any prelude (useful in conjunction with some other 
+         commands). It is supposed the bibtex file is made up of a 
+         prelude containing @string definitions and a series of bibtex 
+         entries.
+
+    tml
+        A shortcut for: 
+        nnIsYear,downcaseType,stripRedundantTitle,stripEmpty,bracket,align,unwrap,indent 
+        (see also TBibTools#format_option_tml)
+
+
+Examples:
+
+Reformat the bib file
+
+  tbibtools -f tml < monos.bib > monos_sorted.bib
+
+  tbibtools -f gsub=Ã¤:\"a:Ã¶:\"o:Ã¼:\"u < monos.bib > monos_sorted.bib
+
+List the contents (see also TBibTools#format_option_ls)
+
+  tbibtools --ls < monos.bib
+  tbibtools --ls -l "#{_lineno}: #{author|editor|institution}: #{title|booktitle}" < monos.bib
+
+Extract a few entries à la grep (kind of):
+
+  tbibtools -P -e Hugo < monos.bib
+  tbibtools -P -q author=Adorno -q keywords=Adorno < monos.bib
+  tbibtools -P -q author="Husserl|Merleau-Ponty" < monos.bib
+
+

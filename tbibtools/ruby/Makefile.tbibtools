@@ -1,0 +1,14 @@
+prefix=/usr/local
+bindir=${prefix}/bin
+
+tbibtools_app=tbibtools
+
+rdoc:
+	rdoc -o tbibtools -m tbibtools.rb tbibtools.rb tvimtools.rb
+
+install:
+	install -v tbibtools.rb ${bindir}/${tbibtools_app}
+
+uninstall:
+	rm -v ${bindir}/${tbibtools_app}
+
