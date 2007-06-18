@@ -2,8 +2,8 @@
 #   @Author:      Thomas Link (samul AT web de)
 #   @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 #   @Created:     2007-03-28.
-#   @Last Change: 2007-06-05.
-#   @Revision:    0.40
+#   @Last Change: 2007-06-17.
+#   @Revision:    0.57
 
 class TVimTools
     def initialize(buffer=nil)
@@ -21,16 +21,15 @@ class TVimTools
 
     def buffer_delete_range(from, to)
         # p "DBG buffer_delete_range #{from} #{to}"
-        for i in from..to
+        from.upto(to) do |i|
             @buffer.delete(from)
         end
     end
 
     def buffer_append_text(line, text)
         # p "DBG buffer_append_text #{line}"
-        for l in text.split(/\n/).reverse
+        for l in text.split(/\n/, -1).reverse
             # l = l.gsub(/\\/, '\\\\\\\\')
-            # puts l
             @buffer.append(line, l)
         end
     end

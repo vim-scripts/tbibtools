@@ -32,21 +32,31 @@ Please take care when using this script. Make backups and check the
 output, especially when using the -f command-line option. Don't blame me 
 if you lose information or end up with corrupted bib files.
 
-Features:
+General features:
 
-    - sort bib files
-    - reformat bib files
-    - list keys in a bib file
-    - show bib entries matching a regular expression
-    - merge bib files
+    - Sort bib files
+    - Reformat bib files
+    - List keys in a bib file
+    - Show bib entries matching a regular expression
+    - Merge bib files
+
+Features of the Vim plugin:
+
+    - |:TBibTools|
+        - Sort/reformat selected entries (or the whole buffer)
+    - |:TBibList|
+        - List a bibtex buffer's contents
+        - Filter listed entries on the basis of author names, title, keywords
+        - Preview/jump to specified entries
+        - Copy the keys of selected entries to @*
 
 
 
-Install as vim plugin~
+Install as Vim plugin~
 
 Extract the archive to ~/.vim or ~/vimfiles (Windows).
 
-A vim with compiled-in ruby support is required.
+A Vim with compiled-in ruby support is required.
 
 
 
@@ -71,7 +81,7 @@ file tbibtools.rb and a ruby interpreter is needed.
 
 
 
-For vim users~
+For Vim users~
 The file plugin/tbibtools.vim provides some commands that 
 filters the selected text or the whole buffer through tbibtools.rb. The 
 command line options are the same as for the script.
@@ -83,32 +93,51 @@ command line options are the same as for the script.
         script.
 
                                                     *:TBibList*
-    :'<,'>TBibList [OPTIONS]
+    :'<,'>TBibList[!] [OPTIONS]
         List keys in a bibtex file (mostly the same as TBibTools --ls
         but lets you select an entry and jump to its position in the
         bibtex file).
+
+        The listing is only built the first time you call this command. 
+        In order to refresh the listing later on use [!].
+
+        In the list view:
+        Press <c-p> to quickly preview an entry in the bibtex file.
+        Press <c-c> to copy the keys of the selected entries to @*.
+        Press <cr> (Enter) to jump to the specified entry.
+        Press ? for additional help.
+
+        You can type some text to filter the list of listed entries 
+        according to author, title, or keywords.
 
 
 
 Configuration~
 
 If a file /etc/tbibtools.rb, $USERPROFILE/tbibtools.rb, and 
-$HOME/.tbibtools exist, they are sourced and evaluated in an instance 
-of TBibTools::Configuration. Please see the class documentation for 
-available methods that can be used in the configuration file.
+$HOME/.tbibtools exist, they are evaluated in an instance of 
+TBibTools::Configuration. These are normal ruby files. Please see the 
+class documentation for available methods that can be used in the 
+configuration file.
 
 For further details, go to the ruby directory, type >
 
     make -f Makefile.tbibtools rdoc
 
-and read the documenation for TBibTools::Configuration.
+and read the documentation on TBibTools::Configuration.
 
 Simple-minded example: >
 
+    # Define a default format. If no -f option is given, we'll always 
+    # use this one.
     default_format 'tml'
 
-    shortcut :bar => ['downcaseType', 'unwrap', 'foo', 'quote', 'align', 'indent']
+    # Define a shortcut; use it as in: tbibtools -f bar
+    shortcut :bar => ['downcaseType', 'unwrap', 'foo', 
+                      'quote', 'align', 'indent']
 
+    # Define a new format. Usually the body will do something with the 
+    # v(alue).
     def_format :foo do |a, e, k, v|
         [e, k, "foo #{v}"]
     end
@@ -133,8 +162,8 @@ For a complete list see: tbibtools -h
     bracket
         Enclose non-numeric values in curly braces.
 
-    canonicAuthor
-        Try to format author fields like: NAME SURNAME and ...
+    canonicAuthors
+        Try to format author and editor fields like: NAME SURNAME and ...
 
     canonicPages
         Convert page fields like "NN - NN" or "NN--NN" to "NN-NN". Also detect 
@@ -166,23 +195,28 @@ For a complete list see: tbibtools -h
         Put wrapped text into a single line.
 
     wrap
-        Try to cheaply wrap the value.
+        Try to wrap the value (without taking too much effort to do it 
+        right).
 
     check
         Print a warning on invalid entries
+
+    downcaseType, upcaseType
+        Put the bibtex type in lower/upper case letters.
+
+    list
+        List keys only.
 
     nnIsYear
         Try to correctly sort two-digit numbers in the key, i.e. sort 
         example99 before example00.
 
-    downcaseType
-        Downcase the bibtex type.
+    selectCrossref, unselectCrossref
+        View only entries that are crossreferenced by other entries 
+        or entries that aren't.
 
-    upcaseType
-        Put the bibtex type in upper case letters.
-
-    list
-        List keys only.
+    sortCrossref
+        Put cross-referred entries to the back.
 
     stripPrelude
         Drop any prelude (useful in conjunction with "list").
@@ -232,7 +266,7 @@ Changes~
 - Initial version
 
 0.2
-- The configuration file is always loaded (also when called from VIM)
+- The configuration file is always loaded (also when called from Vim)
 - The configuration file is evaluated in the context of the configuration object (use some kind of configuration DSL)
 - Use optargs for parsing command line arguments (i.e. command line options have slightly changed)
 - Improved simple_bibtex_parser()
@@ -242,4 +276,9 @@ Changes~
 - Merge duplicate entries
 - Merge certain conflicting fields
 - FIX: Problem with --ls
+
+0.4
+- sortCrossref: Put cross-referenced entries to the back.
+- New format: (un)selectCrossref: View only entries that are (not) cross-referenced
+- Improved TBibList (include keywords in list; if g:tbibUseCache is set, the listing will be cached between editing sessions)
 

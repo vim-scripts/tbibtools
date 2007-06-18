@@ -3,8 +3,8 @@
 #   @Author:      Thomas Link (samul AT web de)
 #   @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 #   @Created:     2007-03-28.
-#   @Last Change: 2007-06-08.
-#   @Revision:    0.2.659
+#   @Last Change: 2007-06-09.
+#   @Revision:    0.2.724
 #
 # This file provides the class TBibTools that can be used to sort and 
 # process bibtex files, list bibtex keys etc.
@@ -96,7 +96,7 @@ class TBibTools
 
         # Attribute reader
         def entry_format
-            @entry_format.empty? ? @entry_format_default : @entry_format
+            (@entry_format.empty? ? @entry_format_default : @entry_format).uniq
         end
 
         # Usage in configuration file:
@@ -166,8 +166,8 @@ class TBibTools
         end
 
         # Usage in configuration file:
-        #   format_list '#{_lineno}: #{author|editor|institution}: #{title|booktitle}'
-        def format_list(value)
+        #   list_format '#{_lineno}: #{author|editor|institution}: #{title|booktitle}'
+        def list_format(value)
             @list_format_string = value
         end
 
@@ -194,7 +194,7 @@ class TBibTools
 
         def shortcut_tml(acc=nil)
             sort_case false
-            f = ['nnIsYear', 'downcaseType', 'downcaseKey', \
+            f = ['nnIsYear', 'sortCrossref', 'downcaseType', 'downcaseKey', \
                 'canonicPages', 'canonicAuthors', \
                 'stripRedundantTitle', 'stripEmpty', 'bracket', 'align', \
                 'unwrap', 'indent']
@@ -277,6 +277,19 @@ class TBibTools
                 raise ArgumentError, "Wrong number of arguments for duplicate_field definition: #{name}"
             end
             self.class.send(:define_method, "duplicate_field_#{name}", &block)
+        end
+
+        def is_crossreferenced(e)
+            id = e['_id']
+            @tbibtools.crossreferenced.include?(id)
+        end
+
+        def preprocess_selectCrossref(e)
+            is_crossreferenced(e) ? e : nil
+        end
+
+        def preprocess_unselectCrossref(e)
+            is_crossreferenced(e) ? nil : e
         end
 
         def head_list(e, type)
@@ -392,7 +405,6 @@ class TBibTools
 
         def format_gsub(args, e, k, v)
             for rx, text in args.scan(/([^:]+):([^:]+)/)
-                # p "DBG", rx, text
                 # v = v.gsub(Regexp.new(Regexp.escape(rx)), text.gsub(/[\\]/, '\\\\ \\\\\\0'))
                 v = v.gsub(Regexp.new(Regexp.escape(rx)), text.gsub(/[\\]/, '\\\\\\0'))
             end
@@ -472,9 +484,11 @@ class TBibTools
     end
 
     attr_accessor :configuration
+    attr_accessor :crossreferenced
 
     def initialize
-        @configuration = TBibTools::Configuration.new(self)
+        @configuration   = TBibTools::Configuration.new(self)
+        @crossreferenced = []
     end
 
     def process(args)
@@ -511,7 +525,7 @@ class TBibTools
             end
 
             opts.on('-f', '--format=STRING', String, 'Re-format entries (order matters)') do |value|
-                @configuration.format value.split(/,/)
+                @configuration.format *value.split(/,/)
             end
 
             opts.on('--[no-]formatted', 'Unformatted output') do |bool|
@@ -527,7 +541,7 @@ class TBibTools
            
             opts.on('-l', '--format-list=[STRING]', String, 'Format string for list (implies --ls)') do |value|
                 @configuration.shortcut_ls
-                @configuration.format_list value if value
+                @configuration.list_format value if value
             end
 
             opts.on('--ls', 'Synonym for: -f list,stripPrelude ("list" implies "unwrap")') do |bool|
@@ -566,13 +580,13 @@ class TBibTools
             opts.separator ''
             opts.separator 'Other Options:'
         
-            opts.on('--[no]debug', Integer, 'Show debug messages') do |v|
-                $DEBUG   = v
-                $VERBOSE = v
+            opts.on('--debug', Integer, 'Show debug messages') do |v|
+                $DEBUG   = true
+                $VERBOSE = true
             end
         
-            opts.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
-                $VERBOSE = v
+            opts.on('-v', '--verbose', 'Run verbosely') do |v|
+                $VERBOSE = true
             end
         
             opts.on('-h', '--help', 'Show this message') do
@@ -582,8 +596,9 @@ class TBibTools
 
             opts.separator ''
             opts.separator 'Available formats:'
-            format_names = (['nnIsYear', 'downcaseType', 'upcaseType'] + 
-                            @configuration.methods.find_all{|m| m =~ /^format_/}.collect{|m| m.sub(/^format_/, '')}).sort.join(', ')
+            format_rx = /^(format|preprocess|head|body|tail)_/
+            format_names = (['nnIsYear', 'sortCrossref', 'downcaseType', 'upcaseType'] + 
+                            @configuration.methods.find_all{|m| m =~ format_rx}.collect{|m| m.sub(format_rx, '')}).uniq.sort.join(', ')
             opts.separator format_names
 
             opts.separator ''
@@ -612,7 +627,6 @@ class TBibTools
         unless @configuration.query_rx.empty?
             entries.delete_if do |key, value|
                 @configuration.query_rx.all? do |field, rx|
-                    # p "DBG #{field} #{rx} #{value[field]}"
                     value[field] !~ rx
                 end
             end
@@ -629,6 +643,9 @@ class TBibTools
             acc << prelude
         end
         keys = entries.keys
+        # if @configuration.entry_format.include?('sortCrossref')
+        #     @crossreferenced = keys.map {|k| entries[k]['crossref']}.compact
+        # end
         if field
             keys.sort! do |a,b|
                 aa = entries[a][field] || ''
@@ -641,6 +658,17 @@ class TBibTools
                     aa = replace_yy(aa)
                     bb = replace_yy(bb)
                 end
+                if @configuration.entry_format.include?('sortCrossref') and 
+                    ((ac = @crossreferenced.include?(a)) or (bc = @crossreferenced.include?(b)))
+                    if ac and bc
+                    elsif ac
+                        aa = 1
+                        bb = 0
+                    elsif bc
+                        aa = 0
+                        bb = 1
+                    end
+                end
                 aa <=> bb
             end
         end
@@ -651,7 +679,7 @@ class TBibTools
             else
                 ee = format(e)
             end
-            acc << ee
+            acc << ee if ee
         end
         if @configuration.entry_format.include?('nil')
             ''
@@ -683,7 +711,8 @@ class TBibTools
         for_methods('preprocess') do |meth|
             e = @configuration.send(meth, e)
         end
-        if !@configuration.entry_format.include?('nil')
+        return e unless e
+        unless @configuration.entry_format.include?('nil')
             type = e['_type']
             for_methods('head') do |meth|
                 v = @configuration.send(meth, e, type)
@@ -695,7 +724,6 @@ class TBibTools
                 v = e[k]
                 catch(:next_key) do
                     for f in @configuration.entry_format
-                        # p "DBG #{f}"
                         if f =~ /^(\w+)=(.*)$/
                             f = $1
                             a = $2
@@ -720,7 +748,7 @@ class TBibTools
                 end
             end
         end
-        if !@configuration.entry_format.include?('nil')
+        unless @configuration.entry_format.include?('nil')
             for_methods('tail') do |meth|
                 v = @configuration.send(meth, e)
                 acc << v if v
@@ -778,77 +806,81 @@ class TBibTools
         strings = {}
         entries = {}
         lineno  = 1
-        loop do
-            # m = /^\s*(@(\w+)\{(.*?)\})\s*(?=(^@|\z))/m.match(text)
-            m = /^\s*(@(\w+)\{(.*?))\s*(?=(^@|\z))/m.match(text)
-            if m
-                text  = m.post_match
-                body  = m[0]
-                type  = m[2]
-                inner = m[3]
-                case type.downcase
-                when 'string'
-                    prelude << body
-                    mi = /^\s*(\S+?)\s*=\s*(.+?)\s*\}?\s*$/m.match(inner)
-                    r = mi[2]
-                    if r =~ /^(".*?"|'.*?'|\{.*?\})$/
-                        r = r[1..-2]
+        # m = /^\s*(@(\w+)\{(.*?)\})\s*(?=(^@|\z))/m.match(text)
+        while (m = /^\s*(@(\w+)\{(.*?))\s*(?=(^@|\z))/m.match(text))
+            text  = m.post_match
+            body  = m[0]
+            type  = m[2]
+            inner = m[3]
+            case type.downcase
+            when 'string'
+                prelude << body
+                mi = /^\s*(\S+?)\s*=\s*(.+?)\s*\}?\s*$/m.match(inner)
+                r = mi[2]
+                if r =~ /^(".*?"|'.*?'|\{.*?\})$/
+                    r = r[1..-2]
+                end
+                strings[mi[1]] = r
+            else
+                mi = /^\s*(\S+?)\s*,(.*)$/m.match(inner)
+                id = mi[1]
+                e  = mi[2]
+                # arr = e.scan(/^\s*(\w+)\s*=\s*(\{.*?\}|\d+)\s*[,}]\s*$/m)
+                arr = e.scan(/^\s*(\w+)\s*=\s*(\{.*?\}|".*?"|\d+)\s*[,}]\s*$/m)
+                entry = {}
+                arr.each do |var, val, rest|
+                    # EXPERIMENTAL: something like author={{Top Institute}} didn't work. I'm not sure though if this is able to deal with the last field in a bibtex entry correctly
+                    # n = /^\s*\{(.*?)\}\s*($|\}\s*\z)/m.match(val)
+                    if (n = /^\s*\{(.*?)\}\s*$/m.match(val))
+                        val = n[1]
+                    elsif (n = /^\s*"(.*?)"\s*$/m.match(val))
+                        val = n[1]
                     end
-                    strings[mi[1]] = r
-                else
-                    mi = /^\s*(\S+?)\s*,(.*)$/m.match(inner)
-                    id = mi[1]
-                    e  = mi[2]
-                    # arr = e.scan(/^\s*(\w+)\s*=\s*(\{.*?\}|\d+)\s*[,}]\s*$/m)
-                    arr = e.scan(/^\s*(\w+)\s*=\s*(\{.*?\}|".*?"|\d+)\s*[,}]\s*$/m)
-                    entry = {}
-                    arr.each do |var, val, rest|
-                        # EXPERIMENTAL: something like author={{Top Institute}} didn't work. I'm not sure though if this is able to deal with the last field in a bibtex entry correctly
-                        # n = /^\s*\{(.*?)\}\s*($|\}\s*\z)/m.match(val)
-                        if (n = /^\s*\{(.*?)\}\s*$/m.match(val))
-                            val = n[1]
-                        elsif (n = /^\s*"(.*?)"\s*$/m.match(val))
-                            val = n[1]
-                        end
-                        if strings_expansion and strings[val]
-                            val = strings[val]
-                        end
-                        if (oldval = entry[var])
-                            if oldval != val
-                                meth = "duplicate_field_#{var}"
-                                if @configuration.respond_to?(meth)
-                                    $stderr.puts "Resolve duplicate fields with mismatching values: #{id}.#{var}" if $VERBOSE
-                                    val = @configuration.send(meth, oldval, val)
-                                else
-                                    $stderr.puts "Can't resolve duplicate fields with mismatching values: #{id}.#{var}"
-                                end
+                    if strings_expansion and strings[val]
+                        val = strings[val]
+                    end
+                    if (oldval = entry[var])
+                        if oldval != val
+                            meth = "duplicate_field_#{var}"
+                            if @configuration.respond_to?(meth)
+                                val = @configuration.send(meth, oldval, val)
+                                $stderr.puts "Resolve duplicate fields with mismatching values: #{id}.#{var}" if $VERBOSE
+                                $stderr.puts "=> #{val.inspect}" if $DEBUG
+                            else
+                                $stderr.puts "Can't resolve duplicate fields with mismatching values: #{id}.#{var}"
+                                $stderr.puts "#{oldval.inspect} != #{val.inspect}" if $DEBUG
                             end
                         end
-                        entry[var] = val
                     end
-                    entry['_lineno'] = lineno.to_s
-                    entry['_type']   = type
-                    entry['_id']     = id
-                    entry['_entry']  = body
-                    if entries[id]
-                        if entries[id] != entry
-                            $stderr.puts "Duplicate key, mismatching entries: #{id}"
-                            if $DEBUG
-                                $stderr.puts entries[id]['_entry'].chomp
-                                $stderr.puts '<=>'
-                                $stderr.puts entry['_entry'].chomp
-                                $stderr.puts
-                            end
-                        end
-                        entries[id].update(entry)
-                    else
-                        entries[id] = entry
+                    entry[var] = val
+                    case var
+                    when 'crossref'
+                        @crossreferenced << val
                     end
                 end
-                lineno += (m.pre_match.scan(/\n/).size + body.scan(/\n/).size)
-            else
-                break
+                entry['_lineno'] = lineno.to_s
+                entry['_type']   = type
+                entry['_id']     = id
+                entry['_entry']  = body
+                if entries[id]
+                    if entries[id] != entry
+                        $stderr.puts "Duplicate key, mismatching entries: #{id}"
+                        if $DEBUG
+                            $stderr.puts entries[id]['_entry'].chomp
+                            $stderr.puts '<=>'
+                            $stderr.puts entry['_entry'].chomp
+                            $stderr.puts
+                        end
+                    end
+                    entries[id].update(entry)
+                else
+                    entries[id] = entry
+                end
             end
+            lineno += (m.pre_match.scan(/\n/).size + body.scan(/\n/).size)
+        end
+        if text =~ /\S/
+            $stderr.puts "Trash in bibtex input: #{text}" if $VERBOSE
         end
         return entries, prelude.join
     end
@@ -856,7 +888,6 @@ class TBibTools
     private
     def replace_yy(text)
         text.gsub(/(^|\D)(\d)(\d)(\D|$)/) do |r|
-            # p "DBG #{text} #{r} #$2 #{Time.now.strftime('%y')[0..0].to_i}"
             [
                 $1, 
                 $2.to_i > Time.now.strftime('%y')[0..0].to_i ? '19' : '20',
