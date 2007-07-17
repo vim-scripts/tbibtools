@@ -3,21 +3,21 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-03-30.
-" @Last Change: 2007-06-09.
-" @Revision:    0.4.181
+" @Last Change: 2007-07-17.
+" @Revision:    0.5.185
 
 if &cp || exists("loaded_tbibtools")
     finish
 endif
-if !exists('loaded_tlib') || loaded_tlib < 6
-    echoerr 'tlib >= 0.6 is required'
+if !exists('loaded_tlib') || loaded_tlib < 9
+    echoerr 'tlib >= 0.9 is required'
     finish
 endif
 if !has('ruby')
     echoerr 'tbibtools requires compiled-in ruby support'
     finish
 end
-let loaded_tbibtools = 4
+let loaded_tbibtools = 5
 
 fun! s:SNR()
     return matchstr(expand('<sfile>'), '<SNR>\d\+_\zeSNR$')
@@ -92,9 +92,9 @@ endf
 fun! s:TBibList(bang, args)
     if !empty(a:bang) || !exists('b:tbiblisting')
         if g:tbibUseCache
-            let cfile = tlib#GetCacheName('tbibtools', '', 1)
+            let cfile = tlib#cache#Filename('tbibtools', '', 1)
             if empty(a:bang)
-                let cdata = tlib#CacheGet(cfile)
+                let cdata = tlib#cache#Get(cfile)
                 if !empty(cdata)
                     let b:tbiblisting = cdata.tbiblisting
                 endif
@@ -115,12 +115,12 @@ fun! s:TBibList(bang, args)
             end
 EOR
             if g:tbibUseCache
-                call tlib#CacheSave(cfile, {'tbiblisting': b:tbiblisting})
+                call tlib#cache#Save(cfile, {'tbiblisting': b:tbiblisting})
             endif
         endif
     endif
     let s:bib_win = winnr()
-    let entry = tlib#InputList('m', 'Select entry', b:tbiblisting, g:tbibListViewHandlers)
+    let entry = tlib#input#List('m', 'Select entry', b:tbiblisting, g:tbibListViewHandlers)
     if !empty(entry)
         call s:GotoItem(entry[0])
     endif

@@ -3,8 +3,8 @@
 #   @Author:      Thomas Link (samul AT web de)
 #   @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 #   @Created:     2007-03-28.
-#   @Last Change: 2007-06-09.
-#   @Revision:    0.2.724
+#   @Last Change: 2007-07-05.
+#   @Revision:    0.2.731
 #
 # This file provides the class TBibTools that can be used to sort and 
 # process bibtex files, list bibtex keys etc.
@@ -195,7 +195,7 @@ class TBibTools
         def shortcut_tml(acc=nil)
             sort_case false
             f = ['nnIsYear', 'sortCrossref', 'downcaseType', 'downcaseKey', \
-                'canonicPages', 'canonicAuthors', \
+                'canonicPages', 'canonicAuthors', 'canonicKeywords', 'canonicQuotes', \
                 'stripRedundantTitle', 'stripEmpty', 'bracket', 'align', \
                 'unwrap', 'indent']
             set_format acc, *f
@@ -434,6 +434,29 @@ class TBibTools
         def format_canonicPages(args, e, k, v)
             if k == 'pages'
                 v.gsub!(/\s*[-–]+\s*/, '-')
+            end
+            return [e, k, v]
+        end
+
+        def format_canonicQuotes(args, e, k, v)
+            if v =~ /"/
+                v.gsub!(/(^|[^\\])("|')/) do |t|
+                    pre  = $1
+                    case $2
+                    when '"'
+                        qu = $1 =~ /[[:cntrl:][:punct:][:space:]]/ ? '``' : %{''}
+                    else
+                        qu = $1 =~ /[[:cntrl:][:punct:][:space:]]/ ? '`' : %{'}
+                    end
+                    [pre, qu].join
+                end
+            end
+            return [e, k, v]
+        end
+
+        def format_canonicKeywords(args, e, k, v)
+            if k =~ /^keyword/ and v !~ /;/ and v =~ /,/
+                v.gsub!(/,\s+/, '; ')
             end
             return [e, k, v]
         end

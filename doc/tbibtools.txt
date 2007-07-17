@@ -165,9 +165,16 @@ For a complete list see: tbibtools -h
     canonicAuthors
         Try to format author and editor fields like: NAME SURNAME and ...
 
+    canonicKeywords
+        In fields "keyword" or "keywords" that don't contain a 
+        semi-colon but only commas, replace the commas with semi-colons.
+
     canonicPages
         Convert page fields like "NN - NN" or "NN--NN" to "NN-NN". Also detect 
         wrong hyphen-like characters that look.
+
+    canonicQuotes
+        Convert " and ' to `` or '.
 
     downcaseKey, upcaseKey
         Change the keys case.
@@ -280,5 +287,8 @@ Changes~
 0.4
 - sortCrossref: Put cross-referenced entries to the back.
 - New format: (un)selectCrossref: View only entries that are (not) cross-referenced
-- Improved TBibList (include keywords in list; if g:tbibUseCache is set, the listing will be cached between editing sessions)
+- VIM: Improved TBibList (include keywords in list; if g:tbibUseCache is set, the listing will be cached between editing sessions)
+
+0.5
+- VIM: Require tlib 0.9
 
